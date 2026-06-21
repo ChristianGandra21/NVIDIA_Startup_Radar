@@ -1,40 +1,20 @@
 """
 Schema central de dados do pipeline de scraping/extração.
-Todo conteúdo coletado deve eventualmente virar um StartupProfile.
+Apenas modelos -- nenhuma lógica de fetch, parsing ou extração ainda.
 """
 from __future__ import annotations
 from datetime import datetime
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class SourceEvidence(BaseModel):
-    """Rastreabilidade de cada informação extraída -- usado depois pelo
+    """Rastreabilidade de uma informação extraída -- usado depois pelo
     Evidence Validator Agent para checar se há fontes suficientes."""
 
     url: str
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
     extraction_method: str  # ex: "playwright+trafilatura", "bs4_directory"
     raw_excerpt: str  # trecho cru que sustenta a informação
-
-
-class StartupProfile(BaseModel):
-    """Perfil estruturado de uma startup, possivelmente consolidado
-    a partir de múltiplas fontes (merge_profiles)."""
-
-    name: str
-    website: str | None = None
-    sector: str | None = None
-    description: str | None = None
-    founders: list[str] = []
-    funding_stage: str | None = None
-    funding_amount_usd: float | None = None
-    employee_count_estimate: str | None = None  # faixa, ex: "11-50"
-    ai_signals: list[str] = []
-    tech_stack_mentions: list[str] = []
-    sources: list[SourceEvidence] = []
-
-    def add_source(self, source: SourceEvidence) -> None:
-        self.sources.append(source)
 
 
 class RawPage(BaseModel):
@@ -46,4 +26,25 @@ class RawPage(BaseModel):
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
     fetch_method: str  # "playwright" | "requests"
     raw_html: str | None = None
-    raw_text: str | None = None  # já limpo, se aplicável
+
+
+class StartupProfile(BaseModel):
+    """Perfil estruturado de uma startup."""
+
+    name: str
+    website: str | None = None
+    sector: str | None = None
+    description: str | None = None
+    founders: list[str] = []
+    funding_stage: str | None = None
+    funding_amount_usd: float | None = None
+    employee_count_estimate: str | None = None  # faixa, ex: "11-50"
+    ai_signals: list[str] = []
+    tech_stack_mentions: list[str] = []
+    state: str | None = None
+    business_area: str | None = None
+    program: str | None = None
+    cohort_year: int | None = None
+    cohort_cycle: str | None = None
+    inovativa_status: str | None = None
+    sources: list[SourceEvidence] = []
