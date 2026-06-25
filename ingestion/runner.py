@@ -1,22 +1,13 @@
 """
-Orquestrador de ingestão — executa todas as fontes e retorna
-a lista consolidada de StartupProfile.
+Orquestrador de ingestão — executa todas as fontes e persiste
+os resultados no banco.
 """
 from __future__ import annotations
 
-import asyncio
-
 from services.scraping.schema import StartupProfile
 from services.scraping.fetch import fetch_static
-from services.scraping.directories import (
-    parse_portfolio,
-    ingest_liga,
-    ingest_distrito,
-    ingest_startupsbr,
-)
+from services.scraping.directories import parse_portfolio
 from services.scraping.directories.ace_ventures import ACE_URL
-from services.scraping.directories.liga_ventures import LIGA_INDEX_URL
-from services.scraping.directories.distrito import DISTRITO_BLOG_URL
 
 
 def merge_profiles(profiles: list[StartupProfile]) -> list[StartupProfile]:
@@ -48,29 +39,21 @@ def merge_profiles(profiles: list[StartupProfile]) -> list[StartupProfile]:
 
 
 async def ingest_ace_ventures() -> list[StartupProfile]:
-    from services.scraping.fetch import fetch_static
-
     page = await fetch_static(ACE_URL)
     return parse_portfolio(page)
 
 
-async def ingest_liga_article(url: str) -> list[StartupProfile]:
-    page = await fetch_static(url)
-    return ingest_liga(page)
-
-
-async def ingest_distrito_article(url: str) -> list[StartupProfile]:
-    page = await fetch_static(url)
-    return ingest_distrito(page)
-
-
-async def ingest_startupsbr_article(url: str) -> list[StartupProfile]:
-    page = await fetch_static(url)
-    return ingest_startupsbr(page)
-
-
 async def run_all() -> list[StartupProfile]:
-    """Executa fontes estruturadas (ACE Ventures) e retorna lista consolidada."""
+    """Executa todas as fontes e retorna lista consolidada (sem persistir)."""
     all_profiles: list[StartupProfile] = []
     all_profiles.extend(await ingest_ace_ventures())
     return merge_profiles(all_profiles)
+
+
+async def run_and_persist() -> list[int]:
+    """Executa todas as fontes e persiste os resultados no banco."""
+    from db.repository import save_profiles
+
+    profiles = await run_all()
+    ids = save_profiles(profiles)
+    return ids
