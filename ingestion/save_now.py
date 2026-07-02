@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from ingestion.crawl_all import ingest_ace, ingest_inovativa_all
+from ingestion.crawl_all import ingest_ace_portfolio as ingest_ace, ingest_inovativa_all
 from ingestion.runner import merge_profiles
 from db.repository import save_profiles
 from services.scraping.schema import StartupProfile

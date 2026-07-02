@@ -39,17 +39,32 @@ def list_article_urls(category_html: str, base_url: str) -> list[str]:
     soup = BeautifulSoup(category_html, "html.parser")
     urls: set[str] = set()
     domain = "https://startups.com.br"
+    base_path = base_url.replace(domain, "")
+
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if not href.startswith(domain):
-            if href.startswith("/"):
-                href = f"{domain}{href}"
-            else:
-                continue
+        if href.startswith("/"):
+            href = f"{domain}{href}"
+        elif not href.startswith(domain):
+            continue
+
         path = href.replace(domain, "")
-        # Só inclui URLs de artigos (slug com hífens, não paginação)
-        if path.count("/") >= 4 and path != base_url.replace(domain, ""):
-            last_segment = path.rstrip("/").split("/")[-1]
-            if "/page/" not in path and len(last_segment) > 5 and "-" in last_segment:
-                urls.add(href)
+
+        # Ignora paginação e a própria página índice
+        if "/page/" in path or path == base_path:
+            continue
+
+        # Artigos têm pelo menos 2 níveis de profundidade de path
+        # Ex: /negocios/inteligencia-artificial/nome-do-artigo/
+        segments = [s for s in path.split("/") if s]
+        if len(segments) < 3:
+            continue
+
+        # O último segmento deve ser um slug (com hífen)
+        last = segments[-1]
+        if "-" not in last or len(last) <= 5:
+            continue
+
+        urls.add(href)
+
     return sorted(urls)

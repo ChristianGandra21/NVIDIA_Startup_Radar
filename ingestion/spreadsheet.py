@@ -103,19 +103,5 @@ def ingest_inovativa(url: str = INOVATIVA_URL) -> list[StartupProfile]:
 
 def ingest_sample(url: str = INOVATIVA_URL, n: int = 5) -> list[StartupProfile]:
     content = download_xlsx(url)
-    wb = openpyxl.load_workbook(BytesIO(content), read_only=True)
-    ws = wb[SHEET_NAME]
-    profiles = []
-    for i, row in enumerate(ws.iter_rows(min_row=2, max_row=n + 1, values_only=True), start=2):
-        row_dict = {
-            "ano": row[COL_ANO],
-            "ciclo": row[COL_CICLO],
-            "programa": row[COL_PROGRAMA],
-            "nome": row[COL_NOME],
-            "site": row[COL_SITE],
-            "estado": row[COL_ESTADO],
-            "status": row[COL_STATUS],
-            "area": row[COL_AREA],
-        }
-        profiles.append(row_to_profile(row_dict, i))
-    return profiles
+    rows = parse_xlsx(content)
+    return [row_to_profile(row, i + 2) for i, row in enumerate(rows[:n])]

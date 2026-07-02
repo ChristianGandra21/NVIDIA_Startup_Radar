@@ -7,7 +7,7 @@ from __future__ import annotations
 from psycopg2.extras import execute_values
 
 from services.scraping.schema import StartupProfile
-from db.connection import get_connection, get_cursor
+from db.connection import get_connection
 
 BATCH_SIZE = 500
 
@@ -18,7 +18,12 @@ def save_profile(p: StartupProfile) -> int:
 
 
 def save_profiles(profiles: list[StartupProfile]) -> list[int]:
-    """Persiste múltiplos perfis em uma única transação (batch)."""
+    """Persiste múltiplos perfis em uma única transação (batch).
+
+    Novas startups são inseridas em batch. Startups já existentes
+    são ignoradas (dados de fontes são estáticos entre re-execuções).
+    Sources são inseridas em batch com ON CONFLICT DO NOTHING.
+    """
     if not profiles:
         return []
 
@@ -74,12 +79,8 @@ def save_profiles(profiles: list[StartupProfile]) -> list[int]:
                 for row_idx, row in enumerate(cur.fetchall()):
                     ids[chunk_indices[row_idx]] = row["id"]
 
-        # 4. Atualizar startups existentes (individual, mas geralmente poucas)
-        for i, p in enumerate(profiles):
-            if ids[i] and names_lower[i] in existing_map:
-                _update_startup_in_txn(cur, ids[i], p)
-
-        # 5. Batch INSERT de sources (com ON CONFLICT para ignorar duplicatas)
+        # 4. Batch INSERT de sources (com ON CONFLICT para ignorar duplicatas)
+        #    Inclui tanto startups novas quanto existentes
         all_sources: list[tuple] = []
         for i, p in enumerate(profiles):
             sid = ids[i]

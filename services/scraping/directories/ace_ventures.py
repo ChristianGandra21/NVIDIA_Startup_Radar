@@ -2,6 +2,10 @@
 Parser do portfólio da ACE Ventures.
 https://aceventures.com.br/venture-capital/portfolio/
 
+Nota: o tapi.md lista "https://acestartups.com.br" (desatualizado —
+      o domínio foi sequestrado). ACE Ventures é a empresa atual.
+      ACE Startups Ltda. é a razão social (Crunchbase).
+
 Estrutura HTML: Elementor flip-box com h3 (nome) e a (link).
 O mesmo startup aparece em múltiplas layers do flip — deduplicamos por nome.
 """
@@ -15,7 +19,7 @@ ACE_URL = "https://aceventures.com.br/venture-capital/portfolio/"
 EXTRACTION_METHOD = "bs4_ace_ventures"
 
 
-def parse_portfolio(page: RawPage) -> list[StartupProfile]:
+def ingest_article(page: RawPage) -> list[StartupProfile]:
     """Extrai lista de startups investidas do HTML do portfólio."""
     if not page.raw_html:
         return []
@@ -52,3 +56,7 @@ def parse_portfolio(page: RawPage) -> list[StartupProfile]:
         )
 
     return profiles
+
+
+# Aliases para compatibilidade com código legado
+parse_portfolio = ingest_article

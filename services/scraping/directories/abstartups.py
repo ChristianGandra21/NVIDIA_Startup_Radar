@@ -26,11 +26,27 @@ def ingest_article(page: RawPage) -> list[StartupProfile]:
 
 def list_article_urls(index_html: str) -> list[str]:
     from bs4 import BeautifulSoup
+    from urllib.parse import urlparse
 
     soup = BeautifulSoup(index_html, "html.parser")
+    domain = "https://abstartups.com.br"
     urls: set[str] = set()
+    skip_prefixes = ("/category/", "/tag/", "/page/", "/author/", "/wp-")
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if href.startswith("/category/noticias/") and href != "/category/noticias/":
-            urls.add(f"https://abstartups.com.br{href}")
+        # Normalize relative URLs
+        if href.startswith("/"):
+            href = f"{domain}{href}"
+        if not href.startswith(domain):
+            continue
+        path = urlparse(href).path.rstrip("/")
+        if not path or path == "":
+            continue
+        if any(path.startswith(p) for p in skip_prefixes):
+            continue
+        # Only include paths with at least some depth (articles)
+        if path.strip("/").count("/") == 0 and len(path.strip("/")) > 3:
+            urls.add(href)
+        elif path.strip("/").count("/") >= 1:
+            urls.add(href)
     return sorted(urls)

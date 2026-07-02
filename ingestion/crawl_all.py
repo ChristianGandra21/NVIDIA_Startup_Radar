@@ -30,7 +30,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from services.scraping.fetch import fetch_static
 from services.scraping.smart_fetch import smart_fetch
 from services.scraping.directories import (
-    parse_portfolio,
+    ingest_ace,
     ingest_liga,
     ingest_distrito,
     ingest_startupsbr,
@@ -39,9 +39,12 @@ from services.scraping.directories import (
     ingest_abstartups,
     ingest_endeavor,
     ingest_latitud,
+    ingest_wow,
     ingest_braziljournal,
     ingest_neofeed,
     ingest_exame,
+    ingest_pegn,
+    ingest_mobiletime,
 )
 from services.scraping.directories.ace_ventures import ACE_URL
 from services.scraping.directories.liga_ventures import (
@@ -86,6 +89,14 @@ from services.scraping.directories.neofeed import (
 from services.scraping.directories.exame import (
     INDEX_URL as EXAME_INDEX_URL,
     list_article_urls as exame_list,
+)
+from services.scraping.directories.pegn import (
+    INDEX_URL as PEGN_INDEX_URL,
+    list_article_urls as pegn_list,
+)
+from services.scraping.directories.mobile_time import (
+    INDEX_URL as MOBILETIME_INDEX_URL,
+    list_article_urls as mobiletime_list,
 )
 from services.scraping.schema import StartupProfile
 from services.scraping.startup_site import crawl_startup_site, enrich_profile
@@ -156,10 +167,10 @@ async def _ingest_articles(
 # Ingestão por fonte
 # ---------------------------------------------------------------------------
 
-async def ingest_ace() -> list[StartupProfile]:
+async def ingest_ace_portfolio() -> list[StartupProfile]:
     _log("[ACE] Fetching portfolio...")
     page = await fetch_static(ACE_URL)
-    profiles = parse_portfolio(page)
+    profiles = ingest_ace(page)
     _log(f"[ACE] {len(profiles)} startups")
     return profiles
 
@@ -260,6 +271,26 @@ async def ingest_exame_all() -> list[StartupProfile]:
     )
 
 
+async def ingest_pegn_all() -> list[StartupProfile]:
+    return await _ingest_articles(
+        "PEGN", PEGN_INDEX_URL, pegn_list, ingest_pegn,
+    )
+
+
+async def ingest_mobiletime_all() -> list[StartupProfile]:
+    return await _ingest_articles(
+        "Mobile Time", MOBILETIME_INDEX_URL, mobiletime_list, ingest_mobiletime,
+    )
+
+
+async def ingest_wow_portfolio() -> list[StartupProfile]:
+    _log("[WOW] Fetching portfolio...")
+    page = await fetch_static("https://www.wow.ac/portfolio")
+    profiles = ingest_wow(page)
+    _log(f"[WOW] {len(profiles)} startups")
+    return profiles
+
+
 def ingest_inovativa_all() -> list[StartupProfile]:
     _log("[InovAtiva] Importando planilha...")
     profiles = ingest_inovativa()
@@ -302,7 +333,7 @@ async def main():
     all_profiles: list[StartupProfile] = []
 
     # --- Fontes já existentes ---
-    all_profiles.extend(await ingest_ace())
+    all_profiles.extend(await ingest_ace_portfolio())
     all_profiles.extend(await ingest_startupsbr_ia())
     all_profiles.extend(await ingest_distrito_all())
     all_profiles.extend(await ingest_liga_all())
@@ -318,6 +349,13 @@ async def main():
     all_profiles.extend(await ingest_braziljournal_all())
     all_profiles.extend(await ingest_neofeed_all())
     all_profiles.extend(await ingest_exame_all())
+
+    # --- Aceleradoras ---
+    all_profiles.extend(await ingest_wow_portfolio())
+
+    # --- Novos portais de notícias ---
+    all_profiles.extend(await ingest_pegn_all())
+    all_profiles.extend(await ingest_mobiletime_all())
 
     # --- Planilha InovAtiva ---
     all_profiles.extend(ingest_inovativa_all())

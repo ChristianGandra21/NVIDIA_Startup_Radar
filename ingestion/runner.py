@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from services.scraping.schema import StartupProfile
 from services.scraping.fetch import fetch_static
-from services.scraping.directories import parse_portfolio
+from services.scraping.directories import ingest_ace
 from services.scraping.directories.ace_ventures import ACE_URL
 
 
@@ -40,7 +40,7 @@ def merge_profiles(profiles: list[StartupProfile]) -> list[StartupProfile]:
 
 async def ingest_ace_ventures() -> list[StartupProfile]:
     page = await fetch_static(ACE_URL)
-    return parse_portfolio(page)
+    return ingest_ace(page)
 
 
 async def run_all() -> list[StartupProfile]:
