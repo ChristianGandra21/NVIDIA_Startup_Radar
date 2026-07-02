@@ -1,11 +1,15 @@
 """
 Repositório — operações CRUD para as tabelas do AIRadar.
-Versão otimizada com batch operations para evitar N round-trips.
+Versão otimizada com batch operations via execute_values.
 """
 from __future__ import annotations
 
+from psycopg2.extras import execute_values
+
 from services.scraping.schema import StartupProfile
 from db.connection import get_connection, get_cursor
+
+BATCH_SIZE = 500
 
 
 def save_profile(p: StartupProfile) -> int:
@@ -20,11 +24,12 @@ def save_profiles(profiles: list[StartupProfile]) -> list[int]:
 
     conn = get_connection()
     cur = conn.cursor()
-    ids: list[int] = []
+    ids: list[int] = [0] * len(profiles)
 
     try:
         names_lower = [p.name.lower().strip() for p in profiles]
 
+        # 1. Descobrir quais já existem no banco
         cur.execute(
             "SELECT id, LOWER(name) as name FROM startups WHERE LOWER(name) = ANY(%s)",
             (names_lower,),
@@ -33,22 +38,26 @@ def save_profiles(profiles: list[StartupProfile]) -> list[int]:
         for row in cur.fetchall():
             existing_map[row["name"]] = row["id"]
 
-        insert_vals: list[tuple] = []
+        # 2. Separar novos × existentes
         insert_profiles: list[StartupProfile] = []
-
+        insert_indices: list[int] = []  # posição original em `profiles`
         for i, p in enumerate(profiles):
             key = names_lower[i]
             if key in existing_map:
-                sid = existing_map[key]
-                _update_startup_in_txn(cur, sid, p)
-                ids.append(sid)
+                ids[i] = existing_map[key]
             else:
-                insert_vals.append(_startup_values(p))
                 insert_profiles.append(p)
+                insert_indices.append(i)
 
-        if insert_vals:
-            for vals, p in zip(insert_vals, insert_profiles):
-                cur.execute(
+        # 3. Batch INSERT de novas startups
+        if insert_profiles:
+            for chunk_start in range(0, len(insert_profiles), BATCH_SIZE):
+                chunk = insert_profiles[chunk_start:chunk_start + BATCH_SIZE]
+                chunk_indices = insert_indices[chunk_start:chunk_start + BATCH_SIZE]
+                vals = [_startup_values(p) for p in chunk]
+
+                execute_values(
+                    cur,
                     """
                     INSERT INTO startups
                         (name, website, sector, description, founders,
@@ -56,20 +65,45 @@ def save_profiles(profiles: list[StartupProfile]) -> list[int]:
                          ai_signals, tech_stack_mentions,
                          state, business_area, program, cohort_year, cohort_cycle,
                          inovativa_status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES %s
                     RETURNING id
                     """,
                     vals,
+                    fetch=True,
                 )
-                sid = cur.fetchone()["id"]
-                ids.append(sid)
-                _insert_sources_in_txn(cur, sid, p)
+                for row_idx, row in enumerate(cur.fetchall()):
+                    ids[chunk_indices[row_idx]] = row["id"]
 
+        # 4. Atualizar startups existentes (individual, mas geralmente poucas)
         for i, p in enumerate(profiles):
-            key = names_lower[i]
-            if key in existing_map:
-                sid = existing_map[key]
-                _insert_sources_in_txn(cur, sid, p)
+            if ids[i] and names_lower[i] in existing_map:
+                _update_startup_in_txn(cur, ids[i], p)
+
+        # 5. Batch INSERT de sources (com ON CONFLICT para ignorar duplicatas)
+        all_sources: list[tuple] = []
+        for i, p in enumerate(profiles):
+            sid = ids[i]
+            if not sid or not p.sources:
+                continue
+            for src in p.sources:
+                all_sources.append((
+                    sid, src.url, src.extraction_method,
+                    src.raw_excerpt, src.fetched_at,
+                ))
+
+        if all_sources:
+            for chunk_start in range(0, len(all_sources), BATCH_SIZE):
+                chunk = all_sources[chunk_start:chunk_start + BATCH_SIZE]
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO startup_sources
+                        (startup_id, url, extraction_method, raw_excerpt, fetched_at)
+                    VALUES %s
+                    ON CONFLICT (startup_id, url) DO NOTHING
+                    """,
+                    chunk,
+                )
 
         conn.commit()
     except Exception:
@@ -134,24 +168,3 @@ def _update_startup_in_txn(cur, startup_id: int, p: StartupProfile) -> None:
         f"UPDATE startups SET {', '.join(fields)} WHERE id = %s",
         values,
     )
-
-
-def _insert_sources_in_txn(cur, startup_id: int, p: StartupProfile) -> None:
-    cur.execute(
-        "SELECT url FROM startup_sources WHERE startup_id = %s",
-        (startup_id,),
-    )
-    existing = {row["url"] for row in cur.fetchall()}
-
-    for src in p.sources:
-        if src.url in existing:
-            continue
-        cur.execute(
-            """
-            INSERT INTO startup_sources
-                (startup_id, url, extraction_method, raw_excerpt, fetched_at)
-            VALUES (%s, %s, %s, %s, %s)
-            """,
-            (startup_id, src.url, src.extraction_method,
-             src.raw_excerpt, src.fetched_at),
-        )

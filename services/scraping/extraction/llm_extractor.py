@@ -46,8 +46,14 @@ NÃO invente informações que não estão no texto."""
 _last_call_time: float = 0.0
 
 
+_rate_limit_backoff: float = 0.0
+
+
 def _call_llm(text: str) -> list[dict[str, Any]]:
-    global _last_call_time
+    global _last_call_time, _rate_limit_backoff
+
+    import random
+    import time
 
     endpoint = os.getenv(
         "LLM_ENDPOINT",
@@ -56,12 +62,12 @@ def _call_llm(text: str) -> list[dict[str, Any]]:
     api_key = os.getenv("LLM_API_KEY") or ""
     model = os.getenv("LLM_MODEL", "llama3")
     json_mode = os.getenv("LLM_JSON_MODE", "").lower() in ("1", "true", "yes")
-
-    import time
+    rate_delay = float(os.getenv("LLM_RATE_DELAY", "10"))
 
     elapsed = time.time() - _last_call_time
-    if elapsed < 3.0:
-        time.sleep(3.0 - elapsed)
+    min_gap = rate_delay + _rate_limit_backoff
+    if elapsed < min_gap:
+        time.sleep(min_gap - elapsed + random.uniform(0, 1))
 
     import httpx
 
@@ -85,22 +91,33 @@ def _call_llm(text: str) -> list[dict[str, Any]]:
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    for attempt in range(3):
+    max_attempts = 6
+
+    for attempt in range(max_attempts):
         try:
             resp = httpx.post(endpoint, headers=headers, json=payload, timeout=120)
             resp.raise_for_status()
             _last_call_time = time.time()
+            _rate_limit_backoff = max(0.0, _rate_limit_backoff - 1.0)
             data = resp.json()
             raw_content = data["choices"][0]["message"]["content"]
             return _parse_json_response(raw_content)
         except Exception as e:
             import sys
-            msg = f"[LLM] attempt {attempt+1} failed: {type(e).__name__}"
+            is_429 = False
+            msg = f"[LLM] attempt {attempt+1}/{max_attempts} failed: {type(e).__name__}"
             if hasattr(e, "response") and e.response is not None:
-                msg += f" status={e.response.status_code} {e.response.text[:200]}"
+                status = e.response.status_code
+                msg += f" status={status} {e.response.text[:200]}"
+                is_429 = status == 429
             print(msg, file=sys.stderr)
-            if attempt < 2:
-                wait = 10 ** attempt  # 1s, 10s
+            if is_429:
+                _rate_limit_backoff += 30.0
+            if attempt < max_attempts - 1:
+                if is_429:
+                    wait = 2 ** (attempt + 4) + random.uniform(0, 5)
+                else:
+                    wait = 2 ** attempt
                 time.sleep(wait)
 
     return []
@@ -154,7 +171,10 @@ def extract_startups(
 
         funding_amount = item.get("funding_amount")
         if funding_amount is not None:
-            funding_amount = float(funding_amount)
+            try:
+                funding_amount = float(funding_amount)
+            except (ValueError, TypeError):
+                funding_amount = None
 
         profiles.append(
             StartupProfile(
