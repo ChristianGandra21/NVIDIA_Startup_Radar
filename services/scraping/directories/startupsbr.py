@@ -32,15 +32,24 @@ def ingest_article(page: RawPage) -> list[StartupProfile]:
 
 
 def list_article_urls(category_html: str, base_url: str) -> list[str]:
-    """Extrai URLs de artigos de uma página de categoria."""
+    """Extrai URLs de artigos de uma página de categoria.
+    Filtra apenas URLs que são artigos individuais (não categorias/páginas).
+    """
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(category_html, "html.parser")
     urls: set[str] = set()
     domain = "https://startups.com.br"
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if href.startswith(domain) and "/negocios/" in href:
-            urls.add(href)
-        elif href.startswith("/negocios/"):
-            urls.add(f"{domain}{href}")
+        if not href.startswith(domain):
+            if href.startswith("/"):
+                href = f"{domain}{href}"
+            else:
+                continue
+        path = href.replace(domain, "")
+        # Só inclui URLs de artigos (slug com hífens, não paginação)
+        if path.count("/") >= 4 and path != base_url.replace(domain, ""):
+            last_segment = path.rstrip("/").split("/")[-1]
+            if "/page/" not in path and len(last_segment) > 5 and "-" in last_segment:
+                urls.add(href)
     return sorted(urls)

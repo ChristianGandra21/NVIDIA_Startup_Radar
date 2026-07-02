@@ -34,13 +34,12 @@ def ingest_article(page: RawPage) -> list[StartupProfile]:
 
 
 def list_article_urls(index_html: str) -> list[str]:
-    """Extrai URLs de artigos da página de listagem."""
+    """Extrai URLs de artigos da página de listagem (filtra paginação)."""
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(index_html, "html.parser")
     urls: set[str] = set()
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if "/insights/artigos/" in href or "/insights/startups/" in href:
-            if href not in ("https://liga.ventures/insights/startups/",):
-                urls.add(href)
+        if "/insights/artigos/" in href:
+            urls.add(href)
     return sorted(urls)

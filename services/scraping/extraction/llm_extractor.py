@@ -19,6 +19,11 @@ import json
 import os
 from typing import Any
 
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv(Path(__file__).resolve().parent.parent.parent.parent / ".env")
+
 from services.scraping.schema import StartupProfile, SourceEvidence
 
 SYSTEM_PROMPT = """Você é um extrator de dados de startups brasileiras.
@@ -38,7 +43,12 @@ Retorne SEMPRE APENAS uma lista JSON válida, ex:
 NÃO invente informações que não estão no texto."""
 
 
+_last_call_time: float = 0.0
+
+
 def _call_llm(text: str) -> list[dict[str, Any]]:
+    global _last_call_time
+
     endpoint = os.getenv(
         "LLM_ENDPOINT",
         "http://localhost:11434/v1/chat/completions",
@@ -47,7 +57,17 @@ def _call_llm(text: str) -> list[dict[str, Any]]:
     model = os.getenv("LLM_MODEL", "llama3")
     json_mode = os.getenv("LLM_JSON_MODE", "").lower() in ("1", "true", "yes")
 
+    import time
+
+    elapsed = time.time() - _last_call_time
+    if elapsed < 3.0:
+        time.sleep(3.0 - elapsed)
+
     import httpx
+
+    max_chars = 12000
+    if len(text) > max_chars:
+        text = text[:max_chars] + "..."
 
     payload: dict[str, Any] = {
         "model": model,
@@ -65,16 +85,25 @@ def _call_llm(text: str) -> list[dict[str, Any]]:
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    try:
-        resp = httpx.post(endpoint, headers=headers, json=payload, timeout=120)
-        resp.raise_for_status()
-    except Exception:
-        return []
+    for attempt in range(3):
+        try:
+            resp = httpx.post(endpoint, headers=headers, json=payload, timeout=120)
+            resp.raise_for_status()
+            _last_call_time = time.time()
+            data = resp.json()
+            raw_content = data["choices"][0]["message"]["content"]
+            return _parse_json_response(raw_content)
+        except Exception as e:
+            import sys
+            msg = f"[LLM] attempt {attempt+1} failed: {type(e).__name__}"
+            if hasattr(e, "response") and e.response is not None:
+                msg += f" status={e.response.status_code} {e.response.text[:200]}"
+            print(msg, file=sys.stderr)
+            if attempt < 2:
+                wait = 10 ** attempt  # 1s, 10s
+                time.sleep(wait)
 
-    data = resp.json()
-    raw_content = data["choices"][0]["message"]["content"]
-
-    return _parse_json_response(raw_content)
+    return []
 
 
 def _parse_json_response(raw: str) -> list[dict[str, Any]]:

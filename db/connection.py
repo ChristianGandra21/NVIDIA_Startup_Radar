@@ -10,6 +10,10 @@ from typing import Generator
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 def _get_dsn() -> str:

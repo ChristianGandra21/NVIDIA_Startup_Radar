@@ -1,57 +1,101 @@
 """
 Repositório — operações CRUD para as tabelas do AIRadar.
-Mapeia StartupProfile → linhas em startups + startup_sources.
+Versão otimizada com batch operations para evitar N round-trips.
 """
 from __future__ import annotations
 
 from services.scraping.schema import StartupProfile
-from db.connection import get_cursor
+from db.connection import get_connection, get_cursor
 
 
-def _find_existing(name: str) -> int | None:
-    """Busca startup pelo nome exato (case-insensitive). Retorna id ou None."""
-    with get_cursor() as cur:
-        cur.execute("SELECT id FROM startups WHERE LOWER(name) = LOWER(%s)", (name,))
-        row = cur.fetchone()
-        return row["id"] if row else None
+def save_profile(p: StartupProfile) -> int:
+    """Persiste um único perfil."""
+    return save_profiles([p])[0]
 
 
-def _insert_startup(p: StartupProfile) -> int:
-    """Insere uma startup e retorna o id gerado."""
-    with get_cursor() as cur:
+def save_profiles(profiles: list[StartupProfile]) -> list[int]:
+    """Persiste múltiplos perfis em uma única transação (batch)."""
+    if not profiles:
+        return []
+
+    conn = get_connection()
+    cur = conn.cursor()
+    ids: list[int] = []
+
+    try:
+        names_lower = [p.name.lower().strip() for p in profiles]
+
         cur.execute(
-            """
-            INSERT INTO startups
-                (name, website, sector, description, founders,
-                 funding_stage, funding_amount_usd, employee_count_estimate,
-                 ai_signals, tech_stack_mentions,
-                 state, business_area, program, cohort_year, cohort_cycle,
-                 inovativa_status)
-            VALUES
-                (%s, %s, %s, %s, %s,
-                 %s, %s, %s,
-                 %s, %s,
-                 %s, %s, %s, %s, %s,
-                 %s)
-            RETURNING id
-            """,
-            (
-                p.name, p.website, p.sector, p.description,
-                p.founders if p.founders else None,
-                p.funding_stage, p.funding_amount_usd,
-                p.employee_count_estimate,
-                p.ai_signals if p.ai_signals else None,
-                p.tech_stack_mentions if p.tech_stack_mentions else None,
-                p.state, p.business_area, p.program,
-                p.cohort_year, p.cohort_cycle,
-                p.inovativa_status,
-            ),
+            "SELECT id, LOWER(name) as name FROM startups WHERE LOWER(name) = ANY(%s)",
+            (names_lower,),
         )
-        return cur.fetchone()["id"]
+        existing_map: dict[str, int] = {}
+        for row in cur.fetchall():
+            existing_map[row["name"]] = row["id"]
+
+        insert_vals: list[tuple] = []
+        insert_profiles: list[StartupProfile] = []
+
+        for i, p in enumerate(profiles):
+            key = names_lower[i]
+            if key in existing_map:
+                sid = existing_map[key]
+                _update_startup_in_txn(cur, sid, p)
+                ids.append(sid)
+            else:
+                insert_vals.append(_startup_values(p))
+                insert_profiles.append(p)
+
+        if insert_vals:
+            for vals, p in zip(insert_vals, insert_profiles):
+                cur.execute(
+                    """
+                    INSERT INTO startups
+                        (name, website, sector, description, founders,
+                         funding_stage, funding_amount_usd, employee_count_estimate,
+                         ai_signals, tech_stack_mentions,
+                         state, business_area, program, cohort_year, cohort_cycle,
+                         inovativa_status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    vals,
+                )
+                sid = cur.fetchone()["id"]
+                ids.append(sid)
+                _insert_sources_in_txn(cur, sid, p)
+
+        for i, p in enumerate(profiles):
+            key = names_lower[i]
+            if key in existing_map:
+                sid = existing_map[key]
+                _insert_sources_in_txn(cur, sid, p)
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+
+    return ids
 
 
-def _update_startup(startup_id: int, p: StartupProfile) -> None:
-    """Atualiza campos não-nulos de uma startup existente."""
+def _startup_values(p: StartupProfile) -> tuple:
+    return (
+        p.name, p.website, p.sector, p.description,
+        p.founders if p.founders else None,
+        p.funding_stage, p.funding_amount_usd,
+        p.employee_count_estimate,
+        p.ai_signals if p.ai_signals else None,
+        p.tech_stack_mentions if p.tech_stack_mentions else None,
+        p.state, p.business_area, p.program,
+        p.cohort_year, p.cohort_cycle,
+        p.inovativa_status,
+    )
+
+
+def _update_startup_in_txn(cur, startup_id: int, p: StartupProfile) -> None:
     fields = []
     values = []
     for field, value in [
@@ -86,66 +130,28 @@ def _update_startup(startup_id: int, p: StartupProfile) -> None:
 
     fields.append("updated_at = NOW()")
     values.append(startup_id)
+    cur.execute(
+        f"UPDATE startups SET {', '.join(fields)} WHERE id = %s",
+        values,
+    )
 
-    with get_cursor() as cur:
+
+def _insert_sources_in_txn(cur, startup_id: int, p: StartupProfile) -> None:
+    cur.execute(
+        "SELECT url FROM startup_sources WHERE startup_id = %s",
+        (startup_id,),
+    )
+    existing = {row["url"] for row in cur.fetchall()}
+
+    for src in p.sources:
+        if src.url in existing:
+            continue
         cur.execute(
-            f"UPDATE startups SET {', '.join(fields)} WHERE id = %s",
-            values,
+            """
+            INSERT INTO startup_sources
+                (startup_id, url, extraction_method, raw_excerpt, fetched_at)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (startup_id, src.url, src.extraction_method,
+             src.raw_excerpt, src.fetched_at),
         )
-
-
-def _insert_sources(startup_id: int, p: StartupProfile) -> None:
-    """Insere as fontes de uma startup (evita duplicatas por URL)."""
-    with get_cursor() as cur:
-        cur.execute(
-            "SELECT url FROM startup_sources WHERE startup_id = %s",
-            (startup_id,),
-        )
-        existing = {row["url"] for row in cur.fetchall()}
-
-        for src in p.sources:
-            if src.url in existing:
-                continue
-            cur.execute(
-                """
-                INSERT INTO startup_sources
-                    (startup_id, url, extraction_method, raw_excerpt, fetched_at)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (startup_id, src.url, src.extraction_method,
-                 src.raw_excerpt, src.fetched_at),
-            )
-
-
-def save_profile(p: StartupProfile) -> int:
-    """Faz upsert de um StartupProfile. Retorna o id da startup."""
-    existing_id = _find_existing(p.name)
-    if existing_id is not None:
-        _update_startup(existing_id, p)
-        startup_id = existing_id
-    else:
-        startup_id = _insert_startup(p)
-
-    _insert_sources(startup_id, p)
-    return startup_id
-
-
-def save_profiles(profiles: list[StartupProfile]) -> list[int]:
-    """Persiste múltiplos perfis em uma transação."""
-    from db.connection import get_connection
-
-    ids: list[int] = []
-    conn = get_connection()
-
-    for p in profiles:
-        existing_id = _find_existing(p.name)
-        if existing_id is not None:
-            _update_startup(existing_id, p)
-            startup_id = existing_id
-        else:
-            startup_id = _insert_startup(p)
-        _insert_sources(startup_id, p)
-        ids.append(startup_id)
-
-    conn.commit()
-    return ids
