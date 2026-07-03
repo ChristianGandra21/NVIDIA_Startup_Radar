@@ -15,7 +15,7 @@ from services.scraping.extraction.clean_text import clean_text
 from services.scraping.extraction.llm_extractor import extract_startups
 
 # ── constants ────────────────────────────────────────────────────────────────
-INDEX_URL = "https://exame.com/bussola/startups/"
+INDEX_URL = "https://exame.com/tag/startups/"
 EXTRACTION_METHOD = "trafilatura+llm_exame"
 
 
@@ -44,31 +44,45 @@ def list_article_urls(category_html: str, base_url: str) -> list[str]:
     Filters out the category landing page itself and pagination URLs.
     """
     from bs4 import BeautifulSoup
+    from urllib.parse import urlparse
 
     soup = BeautifulSoup(category_html, "html.parser")
     urls: set[str] = set()
 
+    parsed_base = urlparse(base_url)
+    domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
+
+    skip_prefixes = (
+        "/newsletters", "/edicoes", "/colunistas",
+        "/ultimas-noticias", "/institucional",
+    )
+
     for anchor in soup.find_all("a", href=True):
         href: str = anchor["href"]
 
-        # Ensure the link belongs to the same domain
-        if not href.startswith(base_url) and not href.startswith("/"):
-            continue
-
         # Normalise relative URLs
         if href.startswith("/"):
-            href = base_url.rstrip("/") + href
-
-        # Exclude pagination paths (e.g. /page/2/)
-        if "/page/" in href:
+            href = domain + href
+        elif not href.startswith(domain):
             continue
 
-        # Exclude the category landing page itself (/bussola/startups/)
-        if href.rstrip("/") == INDEX_URL.rstrip("/"):
+        # Exclude pagination paths (e.g. /page/2/ or ./2/)
+        if "/page/" in href or href.startswith("./"):
             continue
 
-        # Exclude the bare domain / homepage
-        if href.rstrip("/") == base_url.rstrip("/"):
+        # Exclude the index page itself and the bare domain
+        clean = href.rstrip("/")
+        if clean == base_url.rstrip("/") or clean == domain.rstrip("/"):
+            continue
+
+        # Exclude known section-page prefixes
+        path = urlparse(href).path.rstrip("/")
+        if path.startswith(skip_prefixes):
+            continue
+
+        # Only keep paths whose last segment looks like an article slug
+        last_seg = path.split("/")[-1] if path else ""
+        if last_seg.count("-") < 2 or len(last_seg) <= 15:
             continue
 
         urls.add(href)

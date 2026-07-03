@@ -22,6 +22,10 @@ DYNAMIC_DOMAINS = {
     "www.latitud.com",
     "bossainvest.com",
     "www.bossainvest.com",
+    "abstartups.com.br",
+    "www.abstartups.com.br",
+    "brasil.endeavor.org",
+    "blog.cubo.network",
 }
 
 # Limiar mínimo de conteúdo HTML para considerar fetch_static suficiente

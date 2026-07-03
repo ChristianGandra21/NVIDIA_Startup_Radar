@@ -41,30 +41,51 @@ def ingest_article(page: RawPage) -> list[StartupProfile]:
 def list_article_urls(category_html: str, base_url: str) -> list[str]:
     """Return sorted article URLs found in a Brazil Journal category page.
 
-    Filters out non-article links such as category, tag and pagination URLs.
+    Filters out non-article links such as category, tag, pagination and
+    section-page URLs.
     """
     from bs4 import BeautifulSoup
+    from urllib.parse import urlparse
 
     soup = BeautifulSoup(category_html, "html.parser")
     urls: set[str] = set()
 
+    parsed_base = urlparse(base_url)
+    domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
+
+    skip_prefixes = (
+        "/hot-topic/", "/author/", "/brands", "/anuncie",
+        "/newsletter", "/podcasts", "/videos", "/eventos",
+        "/institucional", "/ultimas",
+    )
+
     for anchor in soup.find_all("a", href=True):
         href: str = anchor["href"]
 
-        # Ensure the link belongs to the same domain
-        if not href.startswith(base_url) and not href.startswith("/"):
-            continue
-
         # Normalise relative URLs
         if href.startswith("/"):
-            href = base_url.rstrip("/") + href
+            href = domain + href
+        elif not href.startswith(domain):
+            continue
 
         # Exclude category, tag and pagination paths
         if "/categoria/" in href or "/tag/" in href or "/page/" in href:
             continue
 
-        # Exclude the bare domain / homepage
-        if href.rstrip("/") == base_url.rstrip("/"):
+        # Exclude the bare domain / homepage and the index page itself
+        clean = href.rstrip("/")
+        if clean == domain.rstrip("/") or clean == base_url.rstrip("/"):
+            continue
+
+        # Exclude known section-page prefixes
+        path = urlparse(href).path.rstrip("/")
+        if path.startswith(skip_prefixes):
+            continue
+
+        # Only keep paths whose last segment looks like an article slug
+        # (at least 2 hyphens and >15 chars — filters out section pages)
+        last_seg = path.split("/")[-1] if path else ""
+        if last_seg.count("-") < 2 or len(last_seg) <= 15:
             continue
 
         urls.add(href)
