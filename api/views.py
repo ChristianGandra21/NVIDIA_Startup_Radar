@@ -51,8 +51,8 @@ def startup_list(request: Request) -> Response:
     qs = qs.distinct()
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(qs, request)
-    serializer = StartupListSerializer(page or qs, many=True)
-    return paginator.get_paginated_response(serializer.data) if page else Response(serializer.data)
+    serializer = StartupListSerializer(page if page is not None else qs, many=True)
+    return paginator.get_paginated_response(serializer.data) if page is not None else Response(serializer.data)
 
 
 @api_view(["GET"])

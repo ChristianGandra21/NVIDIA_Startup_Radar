@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-white: #FFFFFF;
+  --color-gray-50: #F7F8FA;
+  --color-gray-100: #F0F1F3;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #5B5B5B;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #1B1B1B;
+
+  --color-nvidia: #76B900;
+  --color-nvidia-hover: #5F9800;
+  --color-nvidia-glow: rgba(118, 185, 0, 0.15);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  ::selection {
+    background-color: rgba(118, 185, 0, 0.2);
+    color: #1B1B1B;
+  }
+}
+
+@layer utilities {
+  .nvidia-glow {
+    box-shadow: 0 0 40px rgba(118, 185, 0, 0.15), 0 0 80px rgba(118, 185, 0, 0.05);
+  }
+  .nvidia-gradient {
+    background: linear-gradient(135deg, #76B900 0%, #5F9800 100%);
+  }
+  .card-shadow {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .card-shadow-hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+  }
+}
