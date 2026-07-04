@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/components/navbar";
 import Globe from "@/components/globe";
+import Hero from "@/components/ui/demo";
 
 export default function LandingPage() {
   return (
@@ -21,77 +22,7 @@ export default function LandingPage() {
   );
 }
 
-function Hero() {
-  return (
-    <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-white to-gray-50" />
-      <div className="absolute top-1/4 right-0 w-[600px] h-[600px] bg-nvidia/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 left-0 w-[400px] h-[400px] bg-nvidia/5 rounded-full blur-3xl" />
-
-      <div className="relative max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-16 items-center">
-        <div className="space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-nvidia/10 text-nvidia text-xs font-medium rounded-full">
-            <div className="w-1.5 h-1.5 rounded-full bg-nvidia animate-pulse" />
-            AI-Powered Intelligence
-          </div>
-
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
-            NVIDIA{" "}
-            <span className="text-nvidia">Startup AI Radar</span>
-          </h1>
-
-          <p className="text-lg text-gray-600 leading-relaxed max-w-lg">
-            Plataforma inteligente que identifica, classifica e recomenda tecnologias
-            NVIDIA para startups brasileiras com maturidade em inteligência artificial
-            — usando agentes autônomos LangGraph.
-          </p>
-
-          <div className="flex items-center gap-4">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center px-6 py-3 bg-nvidia hover:bg-nvidia-hover text-white font-medium rounded-xl transition-all duration-200 card-shadow-hover"
-            >
-              Acessar Plataforma
-              <svg className="ml-2 w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </Link>
-            <Link
-              href="#como-funciona"
-              className="inline-flex items-center px-6 py-3 text-gray-700 font-medium rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200"
-            >
-              Como funciona
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-8 pt-4">
-            <div>
-              <span className="text-2xl font-semibold text-gray-900">3.838</span>
-              <p className="text-xs text-gray-500 mt-0.5">Startups mapeadas</p>
-            </div>
-            <div className="w-px h-10 bg-gray-200" />
-            <div>
-              <span className="text-2xl font-semibold text-gray-900">16</span>
-              <p className="text-xs text-gray-500 mt-0.5">Fontes de dados</p>
-            </div>
-            <div className="w-px h-10 bg-gray-200" />
-            <div>
-              <span className="text-2xl font-semibold text-gray-900">5</span>
-              <p className="text-xs text-gray-500 mt-0.5">Agentes de IA</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="relative flex items-center justify-center">
-          <div className="absolute inset-0 bg-gradient-to-r from-nvidia/5 via-transparent to-nvidia/5 rounded-full blur-2xl" />
-          <div className="w-full max-w-lg aspect-square">
-            <Globe />
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+// Local Hero function removed. Using imported Hero from components/ui/demo.
 
 function HowItWorks() {
   const steps = [

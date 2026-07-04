@@ -81,8 +81,8 @@ def startup_analyze(request: Request, pk: int) -> Response:
     return Response({
         "startup_id": pk,
         "classification": {
-            "label": result.get("classification", {}).get("label"),
-            "confidence": result.get("classification", {}).get("confidence"),
+            "label": result.get("ai_label"),
+            "confidence": result.get("ai_confidence"),
         },
         "recommendations": [
             {"technology": r.get("technology"), "priority": r.get("priority")}
