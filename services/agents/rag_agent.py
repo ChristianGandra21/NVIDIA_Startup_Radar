@@ -9,47 +9,26 @@ load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 from services.agents.llm import call_llm
 
-NVIDIA_TECH_KB = """
-Tecnologias NVIDIA disponíveis:
+_store = None
+_retriever = None
 
-1. NVIDIA Inception - Programa para startups: benefícios, crédites em nuvem, suporte técnico, go-to-market. Gratuito para startups early-stage.
 
-2. NVIDIA NIM - Microservices para deploy de modelos de IA otimizados. Suporta LLMs, modelos de visão, voz e embedding. Infere 2-5x mais rápido que APIs genéricas.
+def _get_retriever():
+    global _store, _retriever
+    if _retriever is None:
+        from services.rag.vector_store import NVIDIAVectorStore
+        from services.rag.retriever import HybridRetriever
+        _store = NVIDIAVectorStore()
+        _retriever = HybridRetriever(_store)
+    return _retriever
 
-3. NVIDIA NeMo - Framework para treinamento, fine-tuning, avaliação e guardrails de modelos generativos. Inclui NeMo Evaluator e NeMo Guardrails.
 
-4. NeMo Guardrails - Controle de comportamento de assistentes e agentes de IA. Previene jailbreaks, alucinações e tópicos indesejados.
+RAG_SYSTEM_PROMPT = """Você é um especialista em tecnologias NVIDIA para startups.
+Com base no perfil da startup e nos trechos de documentação NVIDIA abaixo,
+selecione as tecnologias NVIDIA MAIS RELEVANTES.
 
-5. NVIDIA Triton Inference Server - Serving de modelos em produção com suporte a múltiplos frameworks (PyTorch, TensorFlow, ONNX). Batching dinâmico e concorrência.
-
-6. TensorRT-LLM - Otimização de inferência de LLMs. Compressão de modelos, quantização INT4/INT8/FP8, kernels fused para GPUs NVIDIA.
-
-7. NVIDIA RAPIDS - Aceleração de pipelines de dados com GPU. Inclui cuDF (dataframes GPU), cuML (ML acelerado), cuGraph (grafos).
-
-8. cuDF - Processamento de dataframes em GPU. API compatível com pandas, até 30x mais rápido em GPUs NVIDIA.
-
-9. cuML - Machine learning acelerado em GPU. Algoritmos de ML clássicos (XGBoost, RF, KMeans, PCA, etc.) em GPU.
-
-10. CUDA - Plataforma de programação paralela em GPU. Base para todas as outras tecnologias NVIDIA.
-
-11. NVIDIA Riva - ASR (reconhecimento de fala), TTS (síntese de voz) e NLP em tempo real. Modelos otimizados para português.
-
-12. NVIDIA Omniverse - Plataforma de simulação, gêmeos digitais e colaboração 3D. Baseada em Universal Scene Description (USD).
-
-13. NVIDIA Isaac - Plataforma para robótica, simulação e autonomia. Inclui Isaac Sim, Isaac ROS e Isaac Manipulator.
-
-14. NVIDIA Clara - Plataforma para saúde e ciências da vida. Imagem médica, genômica, descoberta de fármacos com IA.
-
-15. NVIDIA Morpheus - Cybersecurity com IA acelerada. Detecção de ameaças em tempo real, análise de rede com GPU.
-
-16. NVIDIA AI Enterprise - Plataforma empresarial para IA em produção. Suporte enterprise, segurança, estabilidade e certificação.
-"""
-
-RAG_SYSTEM_PROMPT = f"""Você é um especialista em tecnologias NVIDIA para startups.
-Com base no perfil da startup e nas tecnologias disponíveis, selecione as tecnologias NVIDIA MAIS RELEVANTES.
-
-Base de conhecimento NVIDIA:
-{NVIDIA_TECH_KB}
+Documentação NVIDIA relevante:
+{context}
 
 Para cada tecnologia recomendada, explique POR QUE ela é relevante para a startup.
 Retorne APENAS um JSON com a lista de recomendações:
@@ -73,6 +52,23 @@ def query_nvidia_kb(
     tech_stack: list[str],
     ai_label: str,
 ) -> list[dict[str, Any]]:
+    query_parts = [
+        f"Startup {startup_name} in {sector or 'general'} sector",
+        description or "",
+        f"AI signals: {', '.join(ai_signals[-3:])}" if ai_signals else "",
+        f"Tech stack: {', '.join(tech_stack)}" if tech_stack else "",
+        f"AI maturity: {ai_label}",
+    ]
+    query = " ".join(q for q in query_parts if q)
+
+    retriever = _get_retriever()
+    chunks = retriever.retrieve(query, n_final=5) if retriever.vector_store.count() > 0 else []
+
+    context = "\n\n".join(
+        f"[{c.get('metadata', {}).get('topic', 'NVIDIA')}] {c.get('text', '')[:500]}"
+        for c in chunks
+    ) if chunks else "NVIDIA technologies available for startups."
+
     prompt_parts = [
         f"Startup: {startup_name}",
         f"Setor: {sector or 'N/A'}",
@@ -82,8 +78,9 @@ def query_nvidia_kb(
         f"Stack tecnológica: {', '.join(tech_stack) if tech_stack else 'N/A'}",
     ]
     prompt = "\n".join(prompt_parts)
+    system = RAG_SYSTEM_PROMPT.format(context=context)
 
-    result = call_llm(RAG_SYSTEM_PROMPT, prompt, json_mode=True)
+    result = call_llm(system, prompt, json_mode=True)
     if isinstance(result, dict):
         return result.get("relevant_technologies", [])
     return []
