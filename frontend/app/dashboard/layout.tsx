@@ -123,9 +123,21 @@ export default function DashboardLayout({
             </div>
           </div>
           <div className="pb-4">
-            <div className="flex items-center gap-3 px-3 py-2 text-xs text-gray-400">
+            <div className="flex items-center gap-3 px-3 py-2 text-[10px] text-gray-400">
               <div className="w-2 h-2 rounded-full bg-nvidia animate-pulse flex-shrink-0" />
-              {open && <span className="truncate">Agente IA ativo</span>}
+              {open && (
+                <span className="truncate">
+                  Feito por{" "}
+                  <a
+                    href="https://www.linkedin.com/in/christian-gandra/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-nvidia hover:underline"
+                  >
+                    Christian Gandra
+                  </a>
+                </span>
+              )}
             </div>
           </div>
         </SidebarBody>
