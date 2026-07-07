@@ -9,24 +9,8 @@ import { Marquee } from "@/components/ui/marquee";
 
 const teamAvatars = [
   {
-    initials: "JD",
-    src: "https://res.cloudinary.com/doonkheo8/image/upload/v1770279333/a1.jpg",
-  },
-  {
-    initials: "HJ",
-    src: "https://res.cloudinary.com/doonkheo8/image/upload/v1770279333/a2.jpg",
-  },
-  {
-    initials: "PI",
-    src: "https://res.cloudinary.com/doonkheo8/image/upload/v1770279333/a3.jpg",
-  },
-  {
-    initials: "KD",
-    src: "https://res.cloudinary.com/doonkheo8/image/upload/v1770279333/a4.jpg",
-  },
-  {
-    initials: "LD",
-    src: "https://res.cloudinary.com/doonkheo8/image/upload/v1770279333/a5.jpg",
+    initials: "CG",
+    src: "/perfil.jpeg",
   },
 ];
 
@@ -38,19 +22,20 @@ const stats = [
 
 function AvatarStack() {
   return (
-    <div className="flex -space-x-3">
-      {teamAvatars.map((member, i) => (
-        <Avatar
-          className="size-13 border-2 border-primary bg-neutral-800"
-          key={member.initials}
-          style={{ zIndex: teamAvatars.length - i }}
-        >
-          <AvatarImage alt={`Team member ${i + 1}`} src={member.src} />
+    <div className="flex">
+      <a
+        href="https://www.linkedin.com/in/christian-gandra/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group/avatar transition-transform hover:scale-105 duration-200"
+      >
+        <Avatar className="size-13 border-2 border-primary bg-neutral-800">
+          <AvatarImage alt="Christian Gandra" src="/perfil.jpeg" />
           <AvatarFallback className="bg-neutral-700 text-white text-xs">
-            {member.initials}
+            CG
           </AvatarFallback>
         </Avatar>
-      ))}
+      </a>
     </div>
   );
 }

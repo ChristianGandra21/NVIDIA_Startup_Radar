@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/components/navbar";
-import Globe from "@/components/globe";
 import Hero from "@/components/ui/demo";
 
 export default function LandingPage() {
@@ -16,7 +15,6 @@ export default function LandingPage() {
         <Architecture />
         <Technologies />
         <About />
-        <Footer />
       </main>
     </>
   );
@@ -299,24 +297,4 @@ function About() {
   );
 }
 
-function Footer() {
-  return (
-    <footer className="py-12 border-t border-gray-200">
-      <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-nvidia flex items-center justify-center">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-            </svg>
-          </div>
-          <span className="text-xs text-gray-400">
-            NVIDIA Startup AI Radar &mdash; 2026
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-gray-400">Construído com Next.js + Django + LangGraph</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
+
