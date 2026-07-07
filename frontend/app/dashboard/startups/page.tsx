@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { getStartups, searchStartups, StartupListItem } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { toast } from "sonner";
 
 export default function StartupsPage() {
   const [startups, setStartups] = useState<StartupListItem[]>([]);
@@ -68,15 +69,24 @@ export default function StartupsPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!searchQuery.trim()) {
+      toast.warning("Digite um termo de pesquisa.");
+      return;
+    }
     setSearchMode(true);
     setPage(1);
-    fetchData();
+    toast.promise(fetchData(), {
+      loading: 'Pesquisando startups...',
+      success: 'Busca concluída!',
+      error: 'Erro ao realizar a busca.',
+    });
   };
 
   const clearSearch = () => {
     setSearchQuery("");
     setSearchMode(false);
     setPage(1);
+    toast.success("Pesquisa limpa.");
   };
 
   const handleFilterChange = (setter: (val: string) => void) => (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -92,6 +102,7 @@ export default function StartupsPage() {
     setSelectedFunding("");
     setSelectedState("");
     setPage(1);
+    toast.success("Todos os filtros foram limpos.");
   };
 
   const totalPages = Math.ceil(total / 20);

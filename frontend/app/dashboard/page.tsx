@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Globe from "@/components/globe";
+import RotatingEarth from "@/components/ui/wireframe-dotted-globe";
 import { cn, formatNumber } from "@/lib/utils";
 import { getStats, Stats } from "@/lib/api";
 import Link from "next/link";
@@ -19,21 +19,31 @@ export default function DashboardHome() {
   }, []);
 
   return (
-    <div className="space-y-8">
-      <Header />
-
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
-          {error}
-        </div>
-      )}
-
-      <div className="grid lg:grid-cols-2 gap-8 items-start">
-        <GlobeSection />
-        <KPIsSection stats={stats} loading={loading} />
+    <div className="relative min-h-[calc(100vh-6rem)] space-y-8 pb-8 overflow-hidden">
+      {/* Globe no fundo (background) */}
+      <div className="absolute right-1/2 translate-x-1/2 lg:translate-x-0 lg:right-[-120px] top-20 lg:top-0 w-[450px] h-[450px] lg:w-[600px] lg:h-[600px] z-0 pointer-events-none md:pointer-events-auto opacity-30 lg:opacity-75 select-none">
+        <RotatingEarth width={600} height={600} />
       </div>
 
-      <RecentSection stats={stats} loading={loading} />
+      <div className="relative z-10 space-y-8">
+        <Header />
+
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
+        <div className="grid lg:grid-cols-3 gap-8 items-start">
+          <div className="lg:col-span-2">
+            <KPIsSection stats={stats} loading={loading} />
+          </div>
+          {/* Espaço para o globo do fundo aparecer livremente no desktop */}
+          <div className="hidden lg:block h-[300px] pointer-events-none" />
+        </div>
+
+        <RecentSection stats={stats} loading={loading} />
+      </div>
     </div>
   );
 }
@@ -45,31 +55,6 @@ function Header() {
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">
           Bem-vindo ao NVIDIA Startup AI Radar
-        </p>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
-          U
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GlobeSection() {
-  return (
-    <div className="relative bg-white rounded-2xl border border-gray-200 card-shadow overflow-hidden">
-      <div className="absolute top-4 left-4 z-10">
-        <span className="inline-flex px-2 py-0.5 bg-nvidia/10 text-nvidia text-[10px] font-medium rounded-full">
-          AO VIVO
-        </span>
-      </div>
-      <div className="aspect-square w-full max-w-lg mx-auto">
-        <Globe />
-      </div>
-      <div className="absolute bottom-4 left-4 right-4 text-center">
-        <p className="text-xs text-gray-400">
-          Ecossistema de startups brasileiras com IA
         </p>
       </div>
     </div>

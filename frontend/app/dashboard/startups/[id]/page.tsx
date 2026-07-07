@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import { getStartup, analyzeStartup, StartupDetail } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
+import { toast } from "sonner";
 
 export default function StartupDetailPage({
   params,
@@ -34,11 +35,14 @@ export default function StartupDetailPage({
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
+    toast.info("Iniciando análise com agentes de IA...");
     try {
       await analyzeStartup(Number(id));
       await load();
+      toast.success("Análise concluída com sucesso!");
     } catch (e) {
       setError("Erro ao analisar startup");
+      toast.error("Erro ao analisar startup com IA");
     } finally {
       setAnalyzing(false);
     }
@@ -50,6 +54,7 @@ export default function StartupDetailPage({
     if (!startup?.briefings?.[0]) return;
     navigator.clipboard.writeText(startup.briefings[0].briefing_text);
     setCopied(true);
+    toast.success("Briefing copiado para a área de transferência!");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -62,6 +67,7 @@ export default function StartupDetailPage({
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
+    toast.success("Briefing exportado com sucesso (.md)!");
   };
 
   if (loading) {

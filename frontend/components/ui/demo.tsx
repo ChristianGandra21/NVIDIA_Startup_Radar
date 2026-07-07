@@ -108,9 +108,9 @@ export default function Hero() {
               <span className="text-white">AI Radar</span>
             </h1>
             <Link href="/dashboard" passHref>
-              <Button className="rounded-none py-0 pr-0 font-normal text-black text-lg cursor-pointer">
+              <Button className="rounded-none py-0 pr-0 font-normal text-white text-lg cursor-pointer flex items-center">
                 Acessar Radar
-                <span className="border-neutral-500 border-l p-3">
+                <span className="border-white/20 border-l p-3 ml-3 inline-flex items-center justify-center">
                   <ArrowRight />
                 </span>
               </Button>
